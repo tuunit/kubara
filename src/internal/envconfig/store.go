@@ -151,6 +151,30 @@ func (em *EnvStore) GenerateEnvExample() ([]byte, error) {
 	return []byte(b.String()), nil
 }
 
+func (em *EnvStore) GenerateEnvFileFromCurrentValues() ([]byte, error) {
+	var b strings.Builder
+
+	envMap := em.GetConfig()
+	v := reflect.ValueOf(envMap).Elem()
+	t := v.Type()
+
+	for i := 0; i < v.NumField(); i++ {
+		fieldVal := v.Field(i)
+		fieldType := t.Field(i)
+
+		if doc := fieldType.Tag.Get("doc"); doc != "" {
+			b.WriteString(doc + "\n")
+		}
+
+		koanfKey := fieldType.Tag.Get("koanf")
+		if koanfKey != "" {
+			fmt.Fprintf(&b, "%s='%v'\n", koanfKey, fieldVal.Interface())
+		}
+	}
+
+	return []byte(b.String()), nil
+}
+
 // GetCurrentDotEnv returns a new EnvMap for a filepath
 // The function looks at the file loads and validates the EnvMap
 // Encapsulates loading and validation with EnvMapEnvStore
