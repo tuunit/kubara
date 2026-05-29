@@ -17,7 +17,11 @@ var RFC1123Label = regexp.MustCompile(
 	`^[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$`,
 )
 
+var StrictCatalogVersion = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
+
 // ServiceDefinitionAPIVersion is the supported ServiceDefinition apiVersion.
+const CatalogAPIVersion = "kubara.io/v1alpha1"
+const CatalogKind = "Catalog"
 const ServiceDefinitionAPIVersion = "kubara.io/v1alpha1"
 const ServiceDefinitionKind = "ServiceDefinition"
 
@@ -51,6 +55,19 @@ type ServiceSpec struct {
 	ClusterTypes []string `json:"clusterTypes,omitempty"`
 	// ConfigSchema describes config values using OpenAPI v3 schema props.
 	ConfigSchema *apiextensionsv1.JSONSchemaProps `json:"configSchema,omitempty"`
+}
+
+// CatalogManifest describes a catalog root manifest.
+type CatalogManifest struct {
+	APIVersion string      `json:"apiVersion"`
+	Kind       string      `json:"kind"`
+	Metadata   Metadata    `json:"metadata"`
+	Spec       CatalogSpec `json:"spec"`
+}
+
+// CatalogSpec contains catalog-level settings.
+type CatalogSpec struct {
+	Version string `json:"version"`
 }
 
 // Catalog represents a set of service definitions keyed by canonical service name.
@@ -87,6 +104,38 @@ func (d ServiceDefinition) Validate() error {
 	}
 	if d.Spec.Status != service.StatusEnabled && d.Spec.Status != service.StatusDisabled {
 		return fmt.Errorf(`spec.status must be either %q or %q`, service.StatusEnabled, service.StatusDisabled)
+	}
+
+	return nil
+}
+
+func (m CatalogManifest) Validate(requireVersion bool) error {
+	apiVersion := strings.TrimSpace(m.APIVersion)
+	if apiVersion == "" {
+		return fmt.Errorf("missing apiVersion")
+	}
+	if apiVersion != CatalogAPIVersion {
+		return fmt.Errorf("apiVersion must be %q", CatalogAPIVersion)
+	}
+	if strings.TrimSpace(m.Kind) != CatalogKind {
+		return fmt.Errorf("kind must be %q", CatalogKind)
+	}
+	if strings.TrimSpace(m.Metadata.Name) == "" {
+		return fmt.Errorf("missing metadata.name")
+	}
+	if !RFC1123Label.MatchString(m.Metadata.Name) {
+		return fmt.Errorf("metadata.name must adhere to rfc 1123: must be 1-63 characters, start with a lowercase letter, contain only lowercase letters, digits, or '-', and end with a letter or digit")
+	}
+
+	version := strings.TrimSpace(m.Spec.Version)
+	if version == "" {
+		if requireVersion {
+			return fmt.Errorf("missing spec.version")
+		}
+		return nil
+	}
+	if !StrictCatalogVersion.MatchString(version) {
+		return fmt.Errorf(`spec.version must match exact semantic version format "x.y.z" without a leading "v"`)
 	}
 
 	return nil

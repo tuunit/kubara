@@ -1,11 +1,9 @@
 package catalog
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -16,8 +14,9 @@ const servicesDirectory = "services"
 const builtInServicesDirectory = builtInRootDirectory + "/" + servicesDirectory
 
 type LoadOptions struct {
-	CatalogPath string
-	Overwrite   bool
+	CatalogPath        string
+	RegistryConfigPath string
+	Overwrite          bool
 }
 
 func LoadBuiltIn() (Catalog, error) {
@@ -34,14 +33,14 @@ func Load(options LoadOptions) (Catalog, error) {
 		return builtIn, nil
 	}
 
-	externalRoot, err := resolveServicesPath(options.CatalogPath)
+	source, err := ResolveSource(options.CatalogPath, options.RegistryConfigPath)
 	if err != nil {
-		return Catalog{}, fmt.Errorf("resolve catalog services path: %w", err)
+		return Catalog{}, fmt.Errorf("resolve catalog source: %w", err)
 	}
 
-	external, err := loadFromFS(os.DirFS(externalRoot), ".")
+	external, err := loadFromFS(os.DirFS(source.ServicesPath), ".")
 	if err != nil {
-		return Catalog{}, fmt.Errorf("load external catalog from %q: %w", externalRoot, err)
+		return Catalog{}, fmt.Errorf("load external catalog from %q: %w", source.ServicesPath, err)
 	}
 
 	merged := builtIn.Clone()
@@ -54,31 +53,6 @@ func Load(options LoadOptions) (Catalog, error) {
 
 	return merged, nil
 }
-
-func resolveServicesPath(catalogPath string) (string, error) {
-	cleaned := filepath.Clean(catalogPath)
-
-	rootInfo, err := os.Stat(cleaned)
-	if err != nil {
-		return "", fmt.Errorf("catalog directory %q does not exist: %w", cleaned, err)
-	}
-	if !rootInfo.IsDir() {
-		return "", fmt.Errorf("catalog path %q is not a directory", cleaned)
-	}
-
-	servicesDir := filepath.Join(cleaned, servicesDirectory)
-	if servicesInfo, err := os.Stat(servicesDir); err == nil {
-		if !servicesInfo.IsDir() {
-			return "", fmt.Errorf("catalog services path %q is not a directory", servicesDir)
-		}
-		return servicesDir, nil
-	}
-	if errors.Is(err, os.ErrNotExist) {
-		return cleaned, nil
-	}
-	return "", fmt.Errorf("stat catalog services path %q: %w", servicesDir, err)
-}
-
 func loadFromFS(fsys fs.FS, root string) (Catalog, error) {
 	catalog := Catalog{Services: map[string]ServiceDefinition{}}
 

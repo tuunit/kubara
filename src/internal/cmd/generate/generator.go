@@ -24,6 +24,7 @@ type Options struct {
 	CWD                string
 	ConfigFilePath     string
 	CatalogPath        string
+	RegistryConfigPath string
 	CatalogOverwrite   bool
 	ManagedCatalogPath string
 	OverlayValuesPath  string
@@ -162,8 +163,9 @@ func (o *Options) writeTemplateResults(results []render.TemplateResult) error {
 // processClusters loads config, validates, and generates template results for all clusters.
 func (o *Options) processClusters() ([]render.TemplateResult, error) {
 	catalogOptions := catalog.LoadOptions{
-		CatalogPath: o.CatalogPath,
-		Overwrite:   o.CatalogOverwrite,
+		CatalogPath:        o.CatalogPath,
+		RegistryConfigPath: o.RegistryConfigPath,
+		Overwrite:          o.CatalogOverwrite,
 	}
 
 	cs := config.NewConfigStoreWithCatalog(o.ConfigFilePath, catalogOptions)
@@ -200,11 +202,12 @@ func (o *Options) processClusters() ([]render.TemplateResult, error) {
 
 		clusterTplResults, err := render.TemplateFiles(
 			render.TemplateOptions{
-				Type:        o.TemplateType,
-				Provider:    provider,
-				CatalogPath: o.CatalogPath,
-				Overwrite:   o.CatalogOverwrite,
-				Data:        tmplContext,
+				Type:               o.TemplateType,
+				Provider:           provider,
+				CatalogPath:        o.CatalogPath,
+				RegistryConfigPath: o.RegistryConfigPath,
+				Overwrite:          o.CatalogOverwrite,
+				Data:               tmplContext,
 			},
 		)
 		if err != nil {

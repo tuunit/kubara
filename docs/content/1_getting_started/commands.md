@@ -20,6 +20,7 @@ kubara
 [--file]=[value]
 [--help|-h]
 [--kubeconfig]=[value]
+[--registry-config]=[value]
 [--string]=[value]
 [--test-connection]
 [--version|-v]
@@ -40,7 +41,7 @@ kubara [command]
 
 **--base64**: Enable base64 encode/decode mode
 
-**--catalog**="": Path to external ServiceDefinition catalog directory.
+**--catalog**="": Path to an external catalog directory or an OCI reference in the form oci://registry/repository:x.y.z.
 
 **--catalog-overwrite**: Allow external service definitions from --catalog to overwrite built-in definitions on name collisions.
 
@@ -59,6 +60,8 @@ kubara [command]
 **--help, -h**: show help
 
 **--kubeconfig**="": Path to kubeconfig file (default: "~/.kube/config")
+
+**--registry-config**="": Path to a Docker registry config.json file used for private OCI catalog registries.
 
 **--string**="": Input string for base64 operation
 
@@ -93,7 +96,7 @@ Shows a list of commands or help for one command
 
 Generate files from catalog templates
 
->kubara generate [--terraform|--helm] [--managed-catalog PATH --overlay-values PATH] [--catalog PATH [--catalog-overwrite]] [--dry-run]
+>kubara generate [--terraform|--helm] [--managed-catalog PATH --overlay-values PATH] [--catalog PATH_OR_OCI [--registry-config PATH] [--catalog-overwrite]] [--dry-run]
 
 **--dry-run**: Preview generation without creating files
 
@@ -143,7 +146,7 @@ Shows a list of commands or help for one command
 
 Generate a JSON schema for the config yaml structure
 
->kubara schema [--output PATH] [--catalog PATH [--catalog-overwrite]]
+>kubara schema [--output PATH] [--catalog PATH_OR_OCI [--registry-config PATH] [--catalog-overwrite]]
 
 **--help, -h**: show help
 
@@ -178,6 +181,74 @@ Shows a list of commands or help for one command
 Add a service definition to the current catalog
 
 >kubara catalog add SERVICE_NAME
+
+**--help, -h**: show help
+
+#### help, h
+
+Shows a list of commands or help for one command
+
+### package
+
+Package the current catalog directory into the local OCI cache with an OCI reference base
+
+>kubara catalog package [oci://registry/path/]
+
+**--help, -h**: show help
+
+#### help, h
+
+Shows a list of commands or help for one command
+
+### pull
+
+Pull a catalog OCI artifact into the local cache
+
+>kubara catalog pull [--force] [--insecure] oci://registry/repository:x.y.z
+
+**--force**: Refresh an already cached tagged catalog reference.
+
+**--help, -h**: show help
+
+**--insecure**: Ignore TLS certificate verification issues for the registry connection.
+
+#### help, h
+
+Shows a list of commands or help for one command
+
+### push
+
+Package the current catalog or push an existing cached catalog to an OCI registry
+
+>kubara catalog push [--from oci://source/repository:x.y.z] [--insecure] oci://target/repository:x.y.z
+
+**--from**="": Push an existing cached or resolvable OCI catalog reference instead of packaging the current directory.
+
+**--help, -h**: show help
+
+**--insecure**: Ignore TLS certificate verification issues for registry connections.
+
+#### help, h
+
+Shows a list of commands or help for one command
+
+### list
+
+List cached local and OCI-backed catalogs
+
+>kubara catalog list
+
+**--help, -h**: show help
+
+#### help, h
+
+Shows a list of commands or help for one command
+
+### unpackage
+
+Materialize a cached OCI catalog as an editable directory
+
+>kubara catalog unpackage oci://registry/repository:x.y.z [directory]
 
 **--help, -h**: show help
 

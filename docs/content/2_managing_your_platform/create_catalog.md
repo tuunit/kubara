@@ -49,7 +49,11 @@ apiVersion: kubara.io/v1alpha1
 kind: Catalog
 metadata:
   name: my-catalog
+spec:
+  version: 0.1.0
 ```
+
+`spec.version` is the OCI distribution version and must use exact `x.y.z` format without a leading `v`.
 
 ## Add a service
 
@@ -87,6 +91,44 @@ kubara init --catalog ./my-catalog
 kubara generate --catalog ./my-catalog
 ```
 
+You can also package and distribute the same catalog through OCI:
+
+```bash
+cd my-catalog
+kubara catalog package
+kubara catalog package oci://ghcr.io/example/catalogs/
+kubara catalog push --insecure oci://ghcr.io/example/my-catalog:0.1.0
+kubara catalog push --insecure --from oci://localhost/my-catalog:0.1.0 oci://ghcr.io/example/catalogs/my-catalog:0.1.0
+kubara schema --catalog oci://ghcr.io/example/my-catalog:0.1.0
+kubara generate --catalog oci://ghcr.io/example/my-catalog:0.1.0
+kubara catalog list
+kubara catalog unpackage oci://localhost/my-catalog:0.1.0
+```
+
+For private registries, add `--registry-config /path/to/config.json`. kubara uses `~/.docker/config.json` by default and reuses the local cache under `~/.kubara/catalogs` for OCI-backed catalogs. If your registry has certificate issues that you still want to ignore, add `--insecure` to `kubara catalog pull` and `kubara catalog push`. To refresh a cached tagged catalog, run:
+
+```bash
+kubara catalog pull --force --insecure oci://ghcr.io/example/my-catalog:0.1.0
+```
+
+To materialize a cached OCI catalog into an editable directory, run:
+
+```bash
+kubara catalog unpackage oci://localhost/my-catalog:0.1.0
+```
+
+If you omit the package base, kubara stores the packaged catalog under `oci://localhost/<catalog-name>:<spec.version>`. If you want a different local reference, pass a base such as `oci://ghcr.io/example/catalogs/` to `kubara catalog package`.
+
+If you omit the output directory, kubara creates one named after the catalog in your current working directory.
+
+If you want to promote or rename an already cached catalog without repackaging from a working directory, use:
+
+```bash
+kubara catalog push --insecure --from oci://localhost/my-catalog:0.1.0 oci://ghcr.io/example/catalogs/my-catalog:0.1.0
+```
+
+When the source ref is not cached yet, kubara pulls it first and then pushes it to the target reference.
+
 ## Extending the catalog
 
 For a **new** service that does not exist in the built-in catalog, you normally still need both:
@@ -112,8 +154,10 @@ Without `--catalog-overwrite`, kubara rejects the collision. With `--catalog-ove
 ## Practical guidance
 
 - Point `--catalog` at the **catalog root**.
+- Use `oci://...` values with `--catalog` when you want kubara to resolve the catalog from the OCI cache or pull it automatically.
 - Use `kubara catalog create` and `kubara catalog add` as the entrypoint for catalog work.
 - Keep `metadata.name` stable and canonical.
+- Keep `spec.version` aligned with the OCI tag you push.
 - Keep `chartPath` aligned with the chart directory name under `managed-service-catalog/helm/`.
 - Use `configSchema` for defaults and validation instead of documenting required values only in prose.
 - Treat generated files in your repo as output; treat the external catalog as the maintainable source.

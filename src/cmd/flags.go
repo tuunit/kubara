@@ -20,6 +20,7 @@ type GlobalFlags struct {
 	ConfigFilePath     string
 	EnvFilePath        string
 	CatalogPath        string
+	RegistryConfigPath string
 	CatalogOverwrite   bool
 	TestK8sConnection  bool
 	DocsOutputPath     string
@@ -111,8 +112,14 @@ func (flags *GlobalFlags) CLIFlags() []cli.Flag {
 		&cli.StringFlag{
 			Name:        "catalog",
 			Value:       flags.CatalogPath,
-			Usage:       "Path to external ServiceDefinition catalog directory.",
+			Usage:       "Path to an external catalog directory or an OCI reference in the form oci://registry/repository:x.y.z.",
 			Destination: &flags.CatalogPath,
+		},
+		&cli.StringFlag{
+			Name:        "registry-config",
+			Value:       flags.RegistryConfigPath,
+			Usage:       "Path to a Docker registry config.json file used for private OCI catalog registries.",
+			Destination: &flags.RegistryConfigPath,
 		},
 		&cli.BoolFlag{
 			Name:        "catalog-overwrite",
@@ -179,10 +186,29 @@ func catalogLoadOptionsFromCommand(cmd *cli.Command) (catalog.LoadOptions, error
 	}
 
 	rawCatalogPath := strings.TrimSpace(cmd.String("catalog"))
+	rawRegistryConfigPath := strings.TrimSpace(cmd.String("registry-config"))
+
+	registryConfigPath := ""
+	if rawRegistryConfigPath != "" {
+		registryConfigPath, err = utils.GetFullPath(rawRegistryConfigPath, cwd)
+		if err != nil {
+			return catalog.LoadOptions{}, fmt.Errorf("get registry config path: %w", err)
+		}
+	}
+
 	if rawCatalogPath == "" {
 		return catalog.LoadOptions{
-			CatalogPath: "",
-			Overwrite:   cmd.Bool("catalog-overwrite"),
+			CatalogPath:        "",
+			RegistryConfigPath: registryConfigPath,
+			Overwrite:          cmd.Bool("catalog-overwrite"),
+		}, nil
+	}
+
+	if catalog.IsOCIReference(rawCatalogPath) {
+		return catalog.LoadOptions{
+			CatalogPath:        rawCatalogPath,
+			RegistryConfigPath: registryConfigPath,
+			Overwrite:          cmd.Bool("catalog-overwrite"),
 		}, nil
 	}
 
@@ -190,9 +216,9 @@ func catalogLoadOptionsFromCommand(cmd *cli.Command) (catalog.LoadOptions, error
 	if err != nil {
 		return catalog.LoadOptions{}, fmt.Errorf("get catalog path: %w", err)
 	}
-
 	return catalog.LoadOptions{
-		CatalogPath: absoluteCatalogPath,
-		Overwrite:   cmd.Bool("catalog-overwrite"),
+		CatalogPath:        absoluteCatalogPath,
+		RegistryConfigPath: registryConfigPath,
+		Overwrite:          cmd.Bool("catalog-overwrite"),
 	}, nil
 }

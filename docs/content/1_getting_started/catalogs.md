@@ -37,6 +37,13 @@ kubara ships a dedicated `catalog` command group for custom catalogs:
 kubara catalog create my-catalog
 cd my-catalog
 kubara catalog add widget-dashboard
+kubara catalog package
+kubara catalog package oci://ghcr.io/example/catalogs/
+kubara catalog push [--insecure] oci://ghcr.io/example/my-catalog:0.1.0
+kubara catalog push [--insecure] --from oci://localhost/my-catalog:0.1.0 oci://ghcr.io/example/catalogs/my-catalog:0.1.0
+kubara catalog pull [--insecure] oci://ghcr.io/example/my-catalog:0.1.0
+kubara catalog list
+kubara catalog unpackage oci://localhost/my-catalog:0.1.0
 ```
 
 `kubara catalog create` scaffolds a catalog root with:
@@ -49,6 +56,20 @@ kubara catalog add widget-dashboard
 - `customer-service-catalog/terraform/example/`
 
 `kubara catalog add SERVICE_NAME` must be run from that catalog root and creates `services/SERVICE_NAME.yaml`.
+
+`kubara catalog package [oci://registry/path/]` packages the current catalog root into the local OCI cache under `~/.kubara/catalogs` and derives the final catalog reference as `<base><catalog-name>:<spec.version>`. If you omit the base, kubara uses `oci://localhost/`, so a catalog named `my-catalog` at version `0.1.0` is cached as `oci://localhost/my-catalog:0.1.0`.
+
+`kubara catalog push [--insecure] oci://...:x.y.z` packages the current catalog root and pushes it to an OCI registry.
+
+`kubara catalog push [--insecure] --from oci://source/...:x.y.z oci://target/...:x.y.z` copies an existing cached or resolvable catalog reference to a new OCI reference without unpackaging and repackaging. If the source ref is not already cached locally, kubara pulls it first.
+
+`kubara catalog pull [--force] [--insecure] oci://...:x.y.z` caches a remote OCI catalog locally and refreshes an existing cached tag when `--force` is set.
+
+Use `--insecure` for pull and push operations when you need kubara to ignore TLS certificate verification issues for the target registry connection.
+
+`kubara catalog list` shows the locally packaged catalogs and cached OCI references currently stored under `~/.kubara/catalogs`, including the full derived OCI reference for locally packaged catalogs.
+
+`kubara catalog unpackage oci://... [directory]` materializes a cached OCI catalog into an editable directory. This works for pulled remote refs and for locally packaged refs such as `oci://localhost/my-catalog:0.1.0`. If you omit the directory, kubara creates one named after the catalog in the current working directory.
 
 Both catalog names and service names must follow RFC 1123 naming rules: lowercase letters, digits, and `-`, starting with a letter and ending with a letter or digit.
 
@@ -72,20 +93,31 @@ apiVersion: kubara.io/v1alpha1
 kind: Catalog
 metadata:
   name: my-catalog
+spec:
+  version: 0.1.0
 ```
 
-This is the marker file used by `kubara catalog add` to verify that you are inside a catalog root.
+`spec.version` is required for catalog packaging and pushing and must use exact `x.y.z` format without a leading `v`.
+
+This is the marker file used by `kubara catalog add`, `kubara catalog package`, and `kubara catalog push` to verify that you are inside a catalog root.
 
 ## How catalog loading works
 
 When kubara loads a catalog, it does the following:
 
 1. Loads the built-in service definitions.
-2. If `--catalog` is set, loads additional service definitions from your external catalog.
+2. If `--catalog` is set, loads additional service definitions from your external catalog source.
 3. Merges both sets by `metadata.name`.
 4. Rejects name collisions unless `--catalog-overwrite` is set.
 
-An external catalog can be structured in either of these ways for service definitions:
+`--catalog` supports both:
+
+- a local directory path
+- an OCI reference in the form `oci://registry/repository:x.y.z` or `oci://registry/repository@sha256:...`
+
+For OCI references, kubara resolves the catalog from the local cache first and automatically pulls it if the requested artifact is not cached yet. For private registries, use `--registry-config` to point at a Docker `config.json` file. If you do not set it, kubara uses `~/.docker/config.json`.
+
+An external directory catalog can be structured in either of these ways for service definitions:
 
 - `<catalog-root>/services/*.yaml`
 - `<catalog-root>/*.yaml`
